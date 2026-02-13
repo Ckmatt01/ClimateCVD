@@ -353,7 +353,7 @@ merged_data$STROKE_CrudePrev <- as.numeric(as.character(merged_data$STROKE_Crude
 
 #### subset ###################
 # subset data for variables of interest
-subset_data <- merged_data[, c("TractFIPS.1","Pop18Over", "TotalPopulation", "CLIMDIV","HI_C_Change60_69_13_22", 
+subset_data <- merged_data[, c("Temp_C_70_79", "TractFIPS.1", "STATE.x", "Pop18Over", "TotalPopulation", "CLIMDIV","HI_C_Change60_69_13_22", 
                                "HI_C_Change70_79_13_22", "HI_C_Change80_89_13_22", "HI_C_Change90_99_13_22", "HI_C_Change2000_2009_13_22",
                                "Temp_C_2013_2022", "Change_Temp_C_70_79_13_22", "Change_Temp_C_80_89_13_22", "Change_Temp_C_90_99_13_22",
                                "Change_Temp_C_2000_2009_13_22", "Change_RH_70_79_13_22", "Change_RH_80_89_13_22", "Change_RH_90_99_13_22",
@@ -462,7 +462,52 @@ subset_data$transpir_diff2000_2009_13_22_P_x1000 <- subset_data$transpir_diff200
 head(subset_data)
 
 #write to csv file for arcgis 
-write.csv(subset_data, "Scaled_data_forARCgis_09_16_2024.csv", row.names = FALSE)
+#write.csv(subset_data, "Scaled_data_forARCgis_09_16_2024.csv", row.names = FALSE)
+
+##Append Census divisions to subset_data
+
+division_map <- c(
+  "Connecticut"      = "1", "Maine"         = "1", "Massachusettes" = "1", "New Hampshire" = "1", "Rhode Island" = "1", "Vermont" = "1", # New England
+  "New Jersey"       = "2", "New York"      = "2", "Pennsylvania"   = "2",                                                               # Middle Atlantic
+  "Illinois"         = "3", "Indiana"       = "3", "Michigan"       = "3", "Ohio"         = "3", "Wisconsin" = "3",                      # East North Central
+  "Iowa"             = "4", "Kansas"        = "4", "Minnesota"      = "4", "Missouri"      = "4", "Nebraska" = "4", "North Dakota" = "4", "South Dakota" = "4", # West North Central
+  "Delaware"         = "5", "Florida"       = "5", "Georgia"        = "5", "Maryland"      = "5", "North Carolina" = "5", "South Carolina" = "5", "Virginia" = "5", "District of Columbia" = "5", "West Virginia" = "5", # South Atlantic
+  "Alabama"          = "6", "Kentucky"      = "6", "Mississippi"    = "6", "Tennessee"     = "6",                                        # East South Central
+  "Arkansas"         = "7", "Louisiana"     = "7", "Oklahoma"       = "7", "Texas"         = "7",                                        # West South Central
+  "Arizona"          = "8", "Colorado"      = "8", "Idaho"          = "8", "Montana"       = "8", "Nevada" = "8", "New Mexico" = "8", "Utah" = "8", "Wyoming" = "8", # Mountain
+  "Alaska"           = "9", "California"    = "9", "Hawaii"         = "9", "Oregon"        = "9", "Washington" = "9"                     # Pacific
+)
+
+subset_data$CensusDivision <- division_map[as.character(subset_data$STATE.x)]
+
+nacounts <- sapply(subset_data, function(x) sum(is.na(x)))
+print(nacounts)
+
+library(tableone)
+
+# Specify your variables and strata
+vars <- c("ACCESS7_CrudePrev","ARTHRITIS_CrudePrev", "BINGE_CrudePrev",
+          "BPHIGH_CrudePrev", "BPMED_CrudePrev", "CANCER_CrudePrev", "CASTHMA_CrudePrev", "CERVICAL_CrudePrev",
+          "CHD_CrudePrev", "CHECKUP_CrudePrev", "CHOLSCREEN_CrudePrev", "COLON_SCREEN_CrudePrev", "COPD_CrudePrev",
+          "COREM_CrudePrev", "COREW_CrudePrev", "CSMOKING_CrudePrev", "DIABETES_CrudePrev", "DENTAL_CrudePrev",
+          "HIGHCHOL_CrudePrev", "KIDNEY_CrudePrev", "LPA_CrudePrev", "MAMMOUSE_CrudePrev",
+          "OBESITY_CrudePrev_P_div10", "PHLTH_CrudePrev", "SLEEP_CrudePrev", "STROKE_CrudePrev", "TEETHLOST_CrudePrev",
+          "DEPRESSION_CrudePrev", "GHLTH_CrudePrev", "Male_2015_2019", "Female_2015_2019", "Total.population", "White", "Black",
+          "All_OtherRaces", "TwoOrMoreRaces", "Hispanic", "NotHispanic","Median_Income_2015_2019",  "SPL_THEME1", "EP_AGE65", "LCchangeMEAN.y", 
+          "PCT_ImperviousSurfaces",  "Temp_C_2013_2022", "HI_C_Change70_79_13_22")
+
+# Create TableOne with IQR (for non-normal variables)
+tableone <- CreateTableOne(vars = vars, data = subset_data_s1, strata = "HI_C_Change_Tertile", nonnormal = vars)
+
+# Print TableOne (shows median [IQR] for each tertile)
+print(tableone, nonnormal = vars, showAllLevels = TRUE)
+
+# Save to CSV
+tableone_summary <- print(tableone, nonnormal = vars, showAllLevels = TRUE, printToggle = FALSE)
+tableone_df <- as.data.frame(tableone_summary)
+write.csv(tableone_df, "Tableone_IQR_By_Tertile.csv")
+
+
 
 #####################################################################################################
 ###################### The following code creates the supplemental figures #############################
@@ -2778,10 +2823,10 @@ lower_bound_stroke_figS7$stroke_sensible_2000_2009 <- coefficients_stroke_figS7$
 upper_bound_stroke_figS7$stroke_sensible_2000_2009 <- coefficients_stroke_figS7$stroke_sensible_2000_2009 + 1.96 * se_stroke_figS7$stroke_sensible_2000_2009
 
 # Evaporation change 2000-2009
-stroke_evap_2000_2009 <- lmer(STROKE_CrudePrev ~ evap_diff2000_2009_13_22_P_x10 + OBESITY_CrudePrev_P_div10 + EP_AGE65 + PCT_ImperviousSurfaces +
-                                + CSMOKING_CrudePrev + CHECKUP_CrudePrev + SPL_THEME1 +
-                                + Temp_C_2013_2022 + LCchangeMEAN +
-                                (1 | CountyFIPS), data = subset_data)
+stroke_evap_2000_2009 <- lmer(STROKE_CrudePrev ~ evap_diff2000_2009_13_22_P_x10 + OBESITY_CrudePrev_P_div10 + EP_AGE65 + PCT_ImperviousSurfaces + CSMOKING_CrudePrev + CHECKUP_CrudePrev + SPL_THEME1 +
+                              CSMOKING_CrudePrev + CHECKUP_CrudePrev + SPL_THEME1 +
+                              + Temp_C_2013_2022 + LCchangeMEAN +
+                              (1 | CountyFIPS), data = subset_data)
 
 summary(stroke_evap_2000_2009)
 stroke_evap_2000_2009_summary <- summary(stroke_evap_2000_2009)
@@ -4337,6 +4382,914 @@ write.csv(stroke_8_results, "stroke_S7_model_8.csv", row.names = FALSE)
 performance::compare_performance(stroke_1, stroke_2, stroke_3, stroke_4, stroke_5, stroke_6, stroke_7, stroke_8, rank =  TRUE)
 
 
+##START OF STROKE 8 with CLIMDIV, STATE, 11/03/2025
+
+######## Stroke model 8 with CLIMDIV random effects ##########
+coefficients_stroke_8_climdiv <- list()
+se_stroke_8_climdiv <- list()
+tvalue_stroke_8_climdiv <- list()
+lower_bound_8_climdiv <- list()
+upper_bound_8_climdiv <- list()
+
+stroke_8_climdiv <- lmer(STROKE_CrudePrev ~  HI_C_Change70_79_13_22 + OBESITY_CrudePrev_P_div10 + EP_AGE65 +  PCT_ImperviousSurfaces 
+         + CSMOKING_CrudePrev + CHECKUP_CrudePrev + SPL_THEME1 + Temp_C_2013_2022 + LCchangeMEAN + windU_diff70_79_13_22 +
+           windV_diff70_79_13_22 + solar_diff70_79_13_22_P_Mill 
+         + pressure_diff70_79_13_22_P_div10 + precip_diff70_79_13_22_P_x10 + transpir_diff70_79_13_22_P_x1000+
+           (1 | CLIMDIV), data = subset_data)
+summary(stroke_8_climdiv)
+stroke_8_climdiv_summary <- summary(stroke_8_climdiv)
+stroke_8_climdiv_r2 <- r.squaredGLMM(stroke_8_climdiv)
+print(stroke_8_climdiv_r2)
+AIC(stroke_8_climdiv)
+BIC(stroke_8_climdiv)
+
+# Extract coefficients, standard errors, p-values, and calculate 95% confidence intervals
+coefficients_stroke_8_climdiv <- summary(stroke_8_climdiv)$coefficients[, "Estimate"]
+se_stroke_8_climdiv <- summary(stroke_8_climdiv)$coefficients[, "Std. Error"]
+tvalue_stroke_8_climdiv <- summary(stroke_8_climdiv)$coefficients[, "t value"]
+lower_bound_8_climdiv  <-  coefficients_stroke_8_climdiv - 1.96 * se_stroke_8_climdiv 
+upper_bound_8_climdiv  <-  coefficients_stroke_8_climdiv + 1.96 * se_stroke_8_climdiv 
+
+# anomaly size
+avg_HI_C_Change70_79_13_22 <- mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE)
+
+## get percent contribution for each variable 
+# Calculate average anomaly size * coefficient for each variable
+pct_HI_C_Change70_79_13_22_climdiv <- avg_HI_C_Change70_79_13_22 * coefficients_stroke_8_climdiv["HI_C_Change70_79_13_22"] / avg_stroke *100
+
+# Combine into a data frame with lower and upper bounds in one column
+stroke_8_climdiv_results <- data.frame(
+  Variable = c("Heat Index"),
+  Effect_Size = coefficients_stroke_8_climdiv[c("HI_C_Change70_79_13_22")],
+  T_Value = tvalue_stroke_8_climdiv[c("HI_C_Change70_79_13_22")],
+  Confidence_Interval = paste("(", lower_bound_8_climdiv[c("HI_C_Change70_79_13_22")],
+                ", ", upper_bound_8_climdiv[c("HI_C_Change70_79_13_22")], ")", sep = ""),
+  Percent_Contribution = c(pct_HI_C_Change70_79_13_22_climdiv)
+)
+
+# Print or further process the results
+print(stroke_8_climdiv_results)
+
+# Round all values in stroke_8_climdiv_results to 2 decimal places
+stroke_8_climdiv_results$Effect_Size <- round(stroke_8_climdiv_results$Effect_Size, 2)
+stroke_8_climdiv_results$T_Value <- round(stroke_8_climdiv_results$T_Value, 2)
+stroke_8_climdiv_results$Percent_Contribution <- round(stroke_8_climdiv_results$Percent_Contribution, 2)
+# Convert CI column to character to avoid rounding issues
+stroke_8_climdiv_results$Confidence_Interval <- as.character(stroke_8_climdiv_results$Confidence_Interval)
+
+# Extract lower and upper bounds from CI, handle NAs, and round them to 2 decimal places
+lower_bounds <- sub("[(](.*),.*", "\\1", stroke_8_climdiv_results$Confidence_Interval)
+upper_bounds <- sub(".*, (.*)[)]", "\\1", stroke_8_climdiv_results$Confidence_Interval)
+
+# Handle NAs by replacing them with 0
+lower_bounds[is.na(lower_bounds)] <- 0
+upper_bounds[is.na(upper_bounds)] <- 0
+
+# Round the bounds to 2 decimal places
+lower_bounds <- round(as.numeric(lower_bounds), 2)
+upper_bounds <- round(as.numeric(upper_bounds), 2)
+
+# Combine the rounded bounds into the CI column
+stroke_8_climdiv_results$CI <- paste0("(", lower_bounds, ", ", upper_bounds, ")")
+
+# Print stroke_8_climdiv_results or use it further in your analysis
+# remove numeric CI
+stroke_8_climdiv_results <- stroke_8_climdiv_results[, -which(names(stroke_8_climdiv_results) == "Confidence_Interval")]
+# reorder columns
+stroke_8_climdiv_results <- stroke_8_climdiv_results %>%
+  select(Variable, Effect_Size, T_Value, CI, Percent_Contribution)
+
+print(stroke_8_climdiv_results)
+
+#write results to csv
+write.csv(stroke_8_climdiv_results, "stroke_S7_model_8_climdiv.csv", row.names = FALSE)
+
+######## Stroke model 8 with STATE.x random effects ##########
+coefficients_stroke_8_state <- list()
+se_stroke_8_state <- list()
+tvalue_stroke_8_state <- list()
+lower_bound_8_state <- list()
+upper_bound_8_state <- list()
+
+stroke_8_state <- lmer(STROKE_CrudePrev ~  HI_C_Change70_79_13_22 + OBESITY_CrudePrev_P_div10 + EP_AGE65 +  PCT_ImperviousSurfaces 
+         + CSMOKING_CrudePrev + CHECKUP_CrudePrev + SPL_THEME1 + Temp_C_2013_2022 + LCchangeMEAN + windU_diff70_79_13_22 +
+           windV_diff70_79_13_22 + solar_diff70_79_13_22_P_Mill 
+         + pressure_diff70_79_13_22_P_div10 + precip_diff70_79_13_22_P_x10 + transpir_diff70_79_13_22_P_x1000+
+           (1 | STATE.x), data = subset_data)
+summary(stroke_8_state)
+stroke_8_state_summary <- summary(stroke_8_state)
+stroke_8_state_r2 <- r.squaredGLMM(stroke_8_state)
+print(stroke_8_state_r2)
+AIC(stroke_8_state)
+BIC(stroke_8_state)
+
+# Extract coefficients, standard errors, p-values, and calculate 95% confidence intervals
+coefficients_stroke_8_state <- summary(stroke_8_state)$coefficients[, "Estimate"]
+se_stroke_8_state <- summary(stroke_8_state)$coefficients[, "Std. Error"]
+tvalue_stroke_8_state <- summary(stroke_8_state)$coefficients[, "t value"]
+lower_bound_8_state  <-  coefficients_stroke_8_state - 1.96 * se_stroke_8_state 
+upper_bound_8_state  <-  coefficients_stroke_8_state + 1.96 * se_stroke_8_state 
+
+# anomaly size
+avg_HI_C_Change70_79_13_22 <- mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE)
+
+## get percent contribution for each variable 
+# Calculate average anomaly size * coefficient for each variable
+pct_HI_C_Change70_79_13_22_state <- avg_HI_C_Change70_79_13_22 * coefficients_stroke_8_state["HI_C_Change70_79_13_22"] / avg_stroke *100
+
+# Combine into a data frame with lower and upper bounds in one column
+stroke_8_state_results <- data.frame(
+  Variable = c("Heat Index"),
+  Effect_Size = coefficients_stroke_8_state[c("HI_C_Change70_79_13_22")],
+  T_Value = tvalue_stroke_8_state[c("HI_C_Change70_79_13_22")],
+  Confidence_Interval = paste("(", lower_bound_8_state[c("HI_C_Change70_79_13_22")],
+                ", ", upper_bound_8_state[c("HI_C_Change70_79_13_22")], ")", sep = ""),
+  Percent_Contribution = c(pct_HI_C_Change70_79_13_22_state)
+)
+
+# Print or further process the results
+print(stroke_8_state_results)
+
+# Round all values in stroke_8_state_results to 2 decimal places
+stroke_8_state_results$Effect_Size <- round(stroke_8_state_results$Effect_Size, 2)
+stroke_8_state_results$T_Value <- round(stroke_8_state_results$T_Value, 2)
+stroke_8_state_results$Percent_Contribution <- round(stroke_8_state_results$Percent_Contribution, 2)
+# Convert CI column to character to avoid rounding issues
+stroke_8_state_results$Confidence_Interval <- as.character(stroke_8_state_results$Confidence_Interval)
+
+# Extract lower and upper bounds from CI, handle NAs, and round them to 2 decimal places
+lower_bounds <- sub("[(](.*),.*", "\\1", stroke_8_state_results$Confidence_Interval)
+upper_bounds <- sub(".*, (.*)[)]", "\\1", stroke_8_state_results$Confidence_Interval)
+
+# Handle NAs by replacing them with 0
+lower_bounds[is.na(lower_bounds)] <- 0
+upper_bounds[is.na(upper_bounds)] <- 0
+
+# Round the bounds to 2 decimal places
+lower_bounds <- round(as.numeric(lower_bounds), 2)
+upper_bounds <- round(as.numeric(upper_bounds), 2)
+
+# Combine the rounded bounds into the CI column
+stroke_8_state_results$CI <- paste0("(", lower_bounds, ", ", upper_bounds, ")")
+
+# Print stroke_8_state_results or use it further in your analysis
+# remove numeric CI
+stroke_8_state_results <- stroke_8_state_results[, -which(names(stroke_8_state_results) == "Confidence_Interval")]
+# reorder columns
+stroke_8_state_results <- stroke_8_state_results %>%
+  select(Variable, Effect_Size, T_Value, CI, Percent_Contribution)
+
+print(stroke_8_state_results)
+
+#write results to csv
+write.csv(stroke_8_state_results, "stroke_S7_model_8_state.csv", row.names = FALSE)
+
+######## CHD model 8 with CLIMDIV random effects ##########
+coefficients_CHD_8_climdiv <- list()
+se_CHD_8_climdiv <- list()
+tvalue_CHD_8_climdiv <- list()
+lower_bound_8_climdiv <- list()
+upper_bound_8_climdiv <- list()
+
+chd_8_climdiv <- lmer(CHD_CrudePrev ~  HI_C_Change70_79_13_22 + OBESITY_CrudePrev_P_div10 + EP_AGE65 +  PCT_ImperviousSurfaces 
+        + CSMOKING_CrudePrev + CHECKUP_CrudePrev + SPL_THEME1 + Temp_C_2013_2022 + LCchangeMEAN + windU_diff70_79_13_22 +
+        windV_diff70_79_13_22 + solar_diff70_79_13_22_P_Mill +  
+        +  pressure_diff70_79_13_22_P_div10 + precip_diff70_79_13_22_P_x10 + transpir_diff70_79_13_22_P_x1000 +
+        (1 | CLIMDIV), data = subset_data)
+summary(chd_8_climdiv)
+chd_8_climdiv_summary <- summary(chd_8_climdiv)
+chd_8_climdiv_r2 <- r.squaredGLMM(chd_8_climdiv)
+print(chd_8_climdiv_r2)
+AIC(chd_8_climdiv)
+BIC(chd_8_climdiv)
+
+# Extract coefficients, standard errors, p-values, and calculate 95% confidence intervals
+coefficients_CHD_8_climdiv <- summary(chd_8_climdiv)$coefficients[, "Estimate"]
+se_CHD_8_climdiv <- summary(chd_8_climdiv)$coefficients[, "Std. Error"]
+tvalue_CHD_8_climdiv <- summary(chd_8_climdiv)$coefficients[, "t value"]
+lower_bound_8_climdiv  <-  coefficients_CHD_8_climdiv - 1.96 * se_CHD_8_climdiv 
+upper_bound_8_climdiv  <-  coefficients_CHD_8_climdiv + 1.96 * se_CHD_8_climdiv 
+
+# anomaly size
+avg_HI_C_Change70_79_13_22 <- mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE)
+
+## get percent contribution for each variable 
+# Calculate average anomaly size * coefficient for each variable
+pct_HI_C_Change70_79_13_22_climdiv <- avg_HI_C_Change70_79_13_22 * coefficients_CHD_8_climdiv["HI_C_Change70_79_13_22"] / avg_CHD *100
+
+# Combine into a data frame with lower and upper bounds in one column
+CHD_8_climdiv_results <- data.frame(
+  Variable = c("Heat Index"),
+  Effect_Size = coefficients_CHD_8_climdiv[c("HI_C_Change70_79_13_22")],
+  T_Value = tvalue_CHD_8_climdiv[c("HI_C_Change70_79_13_22")],
+  Confidence_Interval = paste("(", lower_bound_8_climdiv[c("HI_C_Change70_79_13_22")],
+                ", ", upper_bound_8_climdiv[c("HI_C_Change70_79_13_22")], ")", sep = ""),
+  Percent_Contribution = c(pct_HI_C_Change70_79_13_22_climdiv)
+)
+
+# Print or further process the results
+print(CHD_8_climdiv_results)
+
+# Round all values in CHD_8_climdiv_results to 2 decimal places
+CHD_8_climdiv_results$Effect_Size <- round(CHD_8_climdiv_results$Effect_Size, 2)
+CHD_8_climdiv_results$T_Value <- round(CHD_8_climdiv_results$T_Value, 2)
+CHD_8_climdiv_results$Percent_Contribution <- round(CHD_8_climdiv_results$Percent_Contribution, 2)
+# Convert CI column to character to avoid rounding issues
+CHD_8_climdiv_results$Confidence_Interval <- as.character(CHD_8_climdiv_results$Confidence_Interval)
+
+# Extract lower and upper bounds from CI, handle NAs, and round them to 2 decimal places
+lower_bounds <- sub("[(](.*),.*", "\\1", CHD_8_climdiv_results$Confidence_Interval)
+upper_bounds <- sub(".*, (.*)[)]", "\\1", CHD_8_climdiv_results$Confidence_Interval)
+
+# Handle NAs by replacing them with 0
+lower_bounds[is.na(lower_bounds)] <- 0
+upper_bounds[is.na(upper_bounds)] <- 0
+
+# Round the bounds to 2 decimal places
+lower_bounds <- round(as.numeric(lower_bounds), 2)
+upper_bounds <- round(as.numeric(upper_bounds), 2)
+
+# Combine the rounded bounds into the CI column
+CHD_8_climdiv_results$CI <- paste0("(", lower_bounds, ", ", upper_bounds, ")")
+
+# Print CHD_8_climdiv_results or use it further in your analysis
+# remove numeric CI
+CHD_8_climdiv_results <- CHD_8_climdiv_results[, -which(names(CHD_8_climdiv_results) == "Confidence_Interval")]
+# reorder columns
+CHD_8_climdiv_results <- CHD_8_climdiv_results %>%
+  select(Variable, Effect_Size, T_Value, CI, Percent_Contribution)
+
+print(CHD_8_climdiv_results)
+#write results to csv
+write.csv(CHD_8_climdiv_results, "CHD_S7_model_8_climdiv.csv", row.names = FALSE)
+
+######## CHD model 8 with STATE.x random effects ##########
+coefficients_CHD_8_state <- list()
+se_CHD_8_state <- list()
+tvalue_CHD_8_state <- list()
+lower_bound_8_state <- list()
+upper_bound_8_state <- list()
+
+chd_8_state <- lmer(CHD_CrudePrev ~  HI_C_Change70_79_13_22 + OBESITY_CrudePrev_P_div10 + EP_AGE65 +  PCT_ImperviousSurfaces 
+        + CSMOKING_CrudePrev + CHECKUP_CrudePrev + SPL_THEME1 + Temp_C_2013_2022 + LCchangeMEAN + windU_diff70_79_13_22 +
+        windV_diff70_79_13_22 + solar_diff70_79_13_22_P_Mill +  
+        +  pressure_diff70_79_13_22_P_div10 + precip_diff70_79_13_22_P_x10 + transpir_diff70_79_13_22_P_x1000 +
+        (1 | STATE.x), data = subset_data)
+summary(chd_8_state)
+chd_8_state_summary <- summary(chd_8_state)
+chd_8_state_r2 <- r.squaredGLMM(chd_8_state)
+print(chd_8_state_r2)
+AIC(chd_8_state)
+BIC(chd_8_state)
+
+# Extract coefficients, standard errors, p-values, and calculate 95% confidence intervals
+coefficients_CHD_8_state <- summary(chd_8_state)$coefficients[, "Estimate"]
+se_CHD_8_state <- summary(chd_8_state)$coefficients[, "Std. Error"]
+tvalue_CHD_8_state <- summary(chd_8_state)$coefficients[, "t value"]
+lower_bound_8_state  <-  coefficients_CHD_8_state - 1.96 * se_CHD_8_state 
+upper_bound_8_state  <-  coefficients_CHD_8_state + 1.96 * se_CHD_8_state 
+
+# anomaly size
+avg_HI_C_Change70_79_13_22 <- mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE)
+
+## get percent contribution for each variable 
+# Calculate average anomaly size * coefficient for each variable
+pct_HI_C_Change70_79_13_22_state <- avg_HI_C_Change70_79_13_22 * coefficients_CHD_8_state["HI_C_Change70_79_13_22"] / avg_CHD *100
+
+# Combine into a data frame with lower and upper bounds in one column
+CHD_8_state_results <- data.frame(
+  Variable = c("Heat Index"),
+  Effect_Size = coefficients_CHD_8_state[c("HI_C_Change70_79_13_22")],
+  T_Value = tvalue_CHD_8_state[c("HI_C_Change70_79_13_22")],
+  Confidence_Interval = paste("(", lower_bound_8_state[c("HI_C_Change70_79_13_22")],
+                ", ", upper_bound_8_state[c("HI_C_Change70_79_13_22")], ")", sep = ""),
+  Percent_Contribution = c(pct_HI_C_Change70_79_13_22_state)
+)
+
+# Print or further process the results
+print(CHD_8_state_results)
+
+# Round all values in CHD_8_state_results to 2 decimal places
+CHD_8_state_results$Effect_Size <- round(CHD_8_state_results$Effect_Size, 2)
+CHD_8_state_results$T_Value <- round(CHD_8_state_results$T_Value, 2)
+CHD_8_state_results$Percent_Contribution <- round(CHD_8_state_results$Percent_Contribution, 2)
+# Convert CI column to character to avoid rounding issues
+CHD_8_state_results$Confidence_Interval <- as.character(CHD_8_state_results$Confidence_Interval)
+
+# Extract lower and upper bounds from CI, handle NAs, and round them to 2 decimal places
+lower_bounds <- sub("[(](.*),.*", "\\1", CHD_8_state_results$Confidence_Interval)
+upper_bounds <- sub(".*, (.*)[)]", "\\1", CHD_8_state_results$Confidence_Interval)
+
+# Handle NAs by replacing them with 0
+lower_bounds[is.na(lower_bounds)] <- 0
+upper_bounds[is.na(upper_bounds)] <- 0
+
+# Round the bounds to 2 decimal places
+lower_bounds <- round(as.numeric(lower_bounds), 2)
+upper_bounds <- round(as.numeric(upper_bounds), 2)
+
+# Combine the rounded bounds into the CI column
+CHD_8_state_results$CI <- paste0("(", lower_bounds, ", ", upper_bounds, ")")
+
+# Print CHD_8_state_results or use it further in your analysis
+# remove numeric CI
+CHD_8_state_results <- CHD_8_state_results[, -which(names(CHD_8_state_results) == "Confidence_Interval")]
+# reorder columns
+CHD_8_state_results <- CHD_8_state_results %>%
+  select(Variable, Effect_Size, T_Value, CI, Percent_Contribution)
+
+print(CHD_8_state_results)
+#write results to csv
+write.csv(CHD_8_state_results, "CHD_S7_model_8_state.csv", row.names = FALSE)
+
+######## Run performance package for all models ############################################
+performance::compare_performance(stroke_1, stroke_2, stroke_3, stroke_4, stroke_5, stroke_6, stroke_7, stroke_8, stroke_8_climdiv, stroke_8_state, rank = TRUE)
+performance::compare_performance(chd_1, chd_2, chd_3, chd_4, chd_5, chd_6, chd_7, chd_8, chd_8_climdiv, chd_8_state, rank = TRUE)
+
+# Extract model statistics for all four models
+# Make sure all models have been run first
+
+# Function to extract RMSE (you may need to calculate this)
+calculate_rmse <- function(model) {
+  residuals <- residuals(model)
+  sqrt(mean(residuals^2, na.rm = TRUE))
+}
+
+# Create a comprehensive results table
+model_results <- data.frame(
+  Model = c("stroke_8_climdiv", "stroke_8_state", "chd_8_climdiv", "chd_8_state"),
+  
+  # Effect size per unit change (coefficient for HI_C_Change70_79_13_22)
+  Effect_Size = c(
+    summary(stroke_8_climdiv)$coefficients["HI_C_Change70_79_13_22", "Estimate"],
+    summary(stroke_8_state)$coefficients["HI_C_Change70_79_13_22", "Estimate"],
+    summary(chd_8_climdiv)$coefficients["HI_C_Change70_79_13_22", "Estimate"],
+    summary(chd_8_state)$coefficients["HI_C_Change70_79_13_22", "Estimate"]
+  ),
+  
+  # Confidence Intervals (95% CI)
+  CI_Lower = c(
+    summary(stroke_8_climdiv)$coefficients["HI_C_Change70_79_13_22", "Estimate"] - 
+      1.96 * summary(stroke_8_climdiv)$coefficients["HI_C_Change70_79_13_22", "Std. Error"],
+    summary(stroke_8_state)$coefficients["HI_C_Change70_79_13_22", "Estimate"] - 
+      1.96 * summary(stroke_8_state)$coefficients["HI_C_Change70_79_13_22", "Std. Error"],
+    summary(chd_8_climdiv)$coefficients["HI_C_Change70_79_13_22", "Estimate"] - 
+      1.96 * summary(chd_8_climdiv)$coefficients["HI_C_Change70_79_13_22", "Std. Error"],
+    summary(chd_8_state)$coefficients["HI_C_Change70_79_13_22", "Estimate"] - 
+      1.96 * summary(chd_8_state)$coefficients["HI_C_Change70_79_13_22", "Std. Error"]
+  ),
+  
+  CI_Upper = c(
+    summary(stroke_8_climdiv)$coefficients["HI_C_Change70_79_13_22", "Estimate"] + 
+      1.96 * summary(stroke_8_climdiv)$coefficients["HI_C_Change70_79_13_22", "Std. Error"],
+    summary(stroke_8_state)$coefficients["HI_C_Change70_79_13_22", "Estimate"] + 
+      1.96 * summary(stroke_8_state)$coefficients["HI_C_Change70_79_13_22", "Std. Error"],
+    summary(chd_8_climdiv)$coefficients["HI_C_Change70_79_13_22", "Estimate"] + 
+      1.96 * summary(chd_8_climdiv)$coefficients["HI_C_Change70_79_13_22", "Std. Error"],
+    summary(chd_8_state)$coefficients["HI_C_Change70_79_13_22", "Estimate"] + 
+      1.96 * summary(chd_8_state)$coefficients["HI_C_Change70_79_13_22", "Std. Error"]
+  ),
+  
+  # T Values
+  T_Value = c(
+    summary(stroke_8_climdiv)$coefficients["HI_C_Change70_79_13_22", "t value"],
+    summary(stroke_8_state)$coefficients["HI_C_Change70_79_13_22", "t value"],
+    summary(chd_8_climdiv)$coefficients["HI_C_Change70_79_13_22", "t value"],
+    summary(chd_8_state)$coefficients["HI_C_Change70_79_13_22", "t value"]
+  ),
+  
+  # R-squared (marginal and conditional)
+  R2_Marginal = c(
+    r.squaredGLMM(stroke_8_climdiv)[1],  # R2m (marginal)
+    r.squaredGLMM(stroke_8_state)[1],
+    r.squaredGLMM(chd_8_climdiv)[1],
+    r.squaredGLMM(chd_8_state)[1]
+  ),
+  
+  R2_Conditional = c(
+    r.squaredGLMM(stroke_8_climdiv)[2],  # R2c (conditional)
+    r.squaredGLMM(stroke_8_state)[2],
+    r.squaredGLMM(chd_8_climdiv)[2],
+    r.squaredGLMM(chd_8_state)[2]
+  ),
+  
+  # RMSE
+  RMSE = c(
+    calculate_rmse(stroke_8_climdiv),
+    calculate_rmse(stroke_8_state),
+    calculate_rmse(chd_8_climdiv),
+    calculate_rmse(chd_8_state)
+  ),
+  
+  # AIC
+  AIC = c(
+    AIC(stroke_8_climdiv),
+    AIC(stroke_8_state),
+    AIC(chd_8_climdiv),
+    AIC(chd_8_state)
+  ),
+  
+  # BIC
+  BIC = c(
+    BIC(stroke_8_climdiv),
+    BIC(stroke_8_state),
+    BIC(chd_8_climdiv),
+    BIC(chd_8_state)
+  )
+)
+
+# Calculate percent HI contribution for each model
+# You'll need avg_stroke and avg_CHD values that should be calculated earlier in your script
+model_results$Percent_HI_Contribution = c(
+  (mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE) * model_results$Effect_Size[1] / avg_stroke) * 100,
+  (mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE) * model_results$Effect_Size[2] / avg_stroke) * 100,
+  (mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE) * model_results$Effect_Size[3] / avg_CHD) * 100,
+  (mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE) * model_results$Effect_Size[4] / avg_CHD) * 100
+)
+
+# Create formatted confidence interval column
+model_results$CI_Formatted = paste0("(", round(model_results$CI_Lower, 3), ", ", round(model_results$CI_Upper, 3), ")")
+
+# Round numerical columns for presentation
+model_results$Effect_Size = round(model_results$Effect_Size, 3)
+model_results$T_Value = round(model_results$T_Value, 2)
+model_results$Percent_HI_Contribution = round(model_results$Percent_HI_Contribution, 2)
+model_results$R2_Marginal = round(model_results$R2_Marginal, 3)
+model_results$R2_Conditional = round(model_results$R2_Conditional, 3)
+model_results$RMSE = round(model_results$RMSE, 3)
+model_results$AIC = round(model_results$AIC, 1)
+model_results$BIC = round(model_results$BIC, 1)
+
+# Select and reorder columns for final output
+final_results <- model_results %>%
+  select(Model, Effect_Size, CI_Formatted, T_Value, Percent_HI_Contribution, 
+         R2_Marginal, R2_Conditional, RMSE, AIC, BIC)
+
+# Rename columns to match your requested format
+names(final_results) <- c("Model", "Effect size per unit change", "CI", "T Value", 
+                         "Percent HI contribution", "R2 Marginal", "R2 Conditional", 
+                         "RMSE", "AIC", "BIC")
+
+print(final_results)
+
+# Save to CSV
+write.csv(final_results, "model_comparison_results.csv", row.names = FALSE)
+
+
+## model 7 but with state or climdiv random effects
+
+######## CHD model 7 ##########
+coefficients_CHD_7_State <- list()
+se_CHD_7_State <- list()
+tvalue_CHD_7_State <- list()
+lower_bound_7_State <- list()
+upper_bound_7_State <- list()
+
+# mixed effects 
+chd_7_State <- lmer(CHD_CrudePrev ~  HI_C_Change70_79_13_22 + OBESITY_CrudePrev_P_div10 + EP_AGE65 +  PCT_ImperviousSurfaces 
+  + CSMOKING_CrudePrev + CHECKUP_CrudePrev + SPL_THEME1 + Temp_C_2013_2022 + LCchangeMEAN +
+  (1 | STATE.x), data = subset_data)
+# chd_6 <- lm(CHD_CrudePrev ~  HI_C_Change70_79_13_22 + SPL_THEME1 + EP_AGE65 + OBESITY_CrudePrev_P_div10 
+#             + CSMOKING_CrudePrev + CHECKUP_CrudePrev +  PCT_ImperviousSurfaces 
+#             + Temp_C_2013_2022 + LCchangeMEAN, data = subset_data)
+# chd_5 <- lm(CHD_CrudePrev ~  HI_C_Change70_79_13_22 + SPL_THEME1 + EP_AGE65 + OBESITY_CrudePrev_P_div10 
+#             + CSMOKING_CrudePrev + CHECKUP_CrudePrev +  PCT_ImperviousSurfaces 
+#             + Temp_C_2013_2022, data = subset_data)
+summary(chd_7_State)
+chd_7_State_summary <- summary(chd_7_State)
+chd_7_State_r2 <- r.squaredGLMM(chd_7_State)
+print(chd_7_State_r2)
+AIC(chd_7_State)
+BIC(chd_7_State)
+rmse(chd_7_State_summary)
+# Extract coefficients, standard errors, p-values, and calculate 95% confidence intervals
+coefficients_CHD_7_State <- summary(chd_7_State)$coefficients[, "Estimate"]
+se_CHD_7_State <- summary(chd_7_State)$coefficients[, "Std. Error"]
+tvalue_CHD_7_State <- summary(chd_7_State)$coefficients[, "t value"]
+lower_bound_7_State  <-  coefficients_CHD_7_State - 1.96 * se_CHD_7_State 
+upper_bound_7_State  <-  coefficients_CHD_7_State + 1.96 * se_CHD_7_State 
+
+# anomaly size
+avg_HI_C_Change70_79_13_22 <- mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE)
+
+## get percent contribution for each variable 
+# Calculate average anomaly size * coefficient for each variable
+pct_HI_C_Change70_79_13_22 <- avg_HI_C_Change70_79_13_22 * coefficients_CHD_7_State["HI_C_Change70_79_13_22"] / avg_CHD *100
+
+
+# Combine into a data frame with lower and upper bounds in one column
+CHD_7_State_results <- data.frame(
+  Variable = c("Heat Index"),
+  Effect_Size = coefficients_CHD_7_State[c("HI_C_Change70_79_13_22")],
+  T_Value = tvalue_CHD_7_State[c("HI_C_Change70_79_13_22")],
+  Confidence_Interval = paste("(", lower_bound_7_State[c("HI_C_Change70_79_13_22")],
+    ", ", upper_bound_7_State[c("HI_C_Change70_79_13_22")], ")", sep = ""),
+  Percent_Contribution = c(pct_HI_C_Change70_79_13_22)
+)
+
+# Print or further process the results
+print(CHD_7_State_results)
+
+# Round all values in CHD_7_State_results to 2 decimal places
+CHD_7_State_results$Effect_Size <- round(CHD_7_State_results$Effect_Size, 2)
+CHD_7_State_results$T_Value <- round(CHD_7_State_results$T_Value, 2)
+CHD_7_State_results$Percent_Contribution <- round(CHD_7_State_results$Percent_Contribution, 2)
+# Convert CI column to character to avoid rounding issues
+CHD_7_State_results$Confidence_Interval <- as.character(CHD_7_State_results$Confidence_Interval)
+
+# Extract lower and upper bounds from CI, handle NAs, and round them to 2 decimal places
+lower_bounds <- sub("[(](.*),.*", "\\1", CHD_7_State_results$Confidence_Interval)
+upper_bounds <- sub(".*, (.*)[)]", "\\1", CHD_7_State_results$Confidence_Interval)
+
+# Handle NAs by replacing them with 0
+lower_bounds[is.na(lower_bounds)] <- 0
+upper_bounds[is.na(upper_bounds)] <- 0
+
+# Round the bounds to 2 decimal places
+lower_bounds <- round(as.numeric(lower_bounds), 2)
+upper_bounds <- round(as.numeric(upper_bounds), 2)
+
+# Combine the rounded bounds into the CI column
+CHD_7_State_results$CI <- paste0("(", lower_bounds, ", ", upper_bounds, ")")
+
+# Print CHD_7_State_results or use it further in your analysis
+# remove numeric CI
+CHD_7_State_results <- CHD_7_State_results[, -which(names(CHD_7_State_results) == "Confidence_Interval")]
+# reorder columns
+CHD_7_State_results <- CHD_7_State_results %>%
+  select(Variable, Effect_Size, T_Value, CI, Percent_Contribution)
+
+print(CHD_7_State_results)
+
+#write results to csv
+write.csv(CHD_7_State_results, "CHD_S7_model_7_State.csv", row.names = FALSE)
+
+######## Stroke model 7 with CLIMDIV random effects ##########
+coefficients_stroke_7_climdiv <- list()
+se_stroke_7_climdiv <- list()
+tvalue_stroke_7_climdiv <- list()
+lower_bound_7_climdiv <- list()
+upper_bound_7_climdiv <- list()
+
+# mixed effects 
+stroke_7_climdiv <- lmer(STROKE_CrudePrev ~  HI_C_Change70_79_13_22 + OBESITY_CrudePrev_P_div10 + EP_AGE65 +  PCT_ImperviousSurfaces 
+  + CSMOKING_CrudePrev + CHECKUP_CrudePrev + SPL_THEME1 + Temp_C_2013_2022 + LCchangeMEAN +
+  (1 | CLIMDIV), data = subset_data)
+
+summary(stroke_7_climdiv)
+stroke_7_climdiv_summary <- summary(stroke_7_climdiv)
+stroke_7_climdiv_r2 <- r.squaredGLMM(stroke_7_climdiv)
+print(stroke_7_climdiv_r2)
+AIC(stroke_7_climdiv)
+BIC(stroke_7_climdiv)
+rmse(stroke_7_climdiv_summary)
+
+# Extract coefficients, standard errors, p-values, and calculate 95% confidence intervals
+coefficients_stroke_7_climdiv <- summary(stroke_7_climdiv)$coefficients[, "Estimate"]
+se_stroke_7_climdiv <- summary(stroke_7_climdiv)$coefficients[, "Std. Error"]
+tvalue_stroke_7_climdiv <- summary(stroke_7_climdiv)$coefficients[, "t value"]
+lower_bound_7_climdiv  <-  coefficients_stroke_7_climdiv - 1.96 * se_stroke_7_climdiv 
+upper_bound_7_climdiv  <-  coefficients_stroke_7_climdiv + 1.96 * se_stroke_7_climdiv 
+
+# anomaly size
+avg_HI_C_Change70_79_13_22 <- mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE)
+
+## get percent contribution for each variable 
+# Calculate average anomaly size * coefficient for each variable
+pct_HI_C_Change70_79_13_22_stroke_climdiv <- avg_HI_C_Change70_79_13_22 * coefficients_stroke_7_climdiv["HI_C_Change70_79_13_22"] / avg_stroke *100
+
+# Combine into a data frame with lower and upper bounds in one column
+stroke_7_climdiv_results <- data.frame(
+  Variable = c("Heat Index"),
+  Effect_Size = coefficients_stroke_7_climdiv[c("HI_C_Change70_79_13_22")],
+  T_Value = tvalue_stroke_7_climdiv[c("HI_C_Change70_79_13_22")],
+  Confidence_Interval = paste("(", lower_bound_7_climdiv[c("HI_C_Change70_79_13_22")],
+    ", ", upper_bound_7_climdiv[c("HI_C_Change70_79_13_22")], ")", sep = ""),
+  Percent_Contribution = c(pct_HI_C_Change70_79_13_22_stroke_climdiv)
+)
+
+# Print or further process the results
+print(stroke_7_climdiv_results)
+
+# Round all values in stroke_7_climdiv_results to 2 decimal places
+stroke_7_climdiv_results$Effect_Size <- round(stroke_7_climdiv_results$Effect_Size, 2)
+stroke_7_climdiv_results$T_Value <- round(stroke_7_climdiv_results$T_Value, 2)
+stroke_7_climdiv_results$Percent_Contribution <- round(stroke_7_climdiv_results$Percent_Contribution, 2)
+# Convert CI column to character to avoid rounding issues
+stroke_7_climdiv_results$Confidence_Interval <- as.character(stroke_7_climdiv_results$Confidence_Interval)
+
+# Extract lower and upper bounds from CI, handle NAs, and round them to 2 decimal places
+lower_bounds <- sub("[(](.*),.*", "\\1", stroke_7_climdiv_results$Confidence_Interval)
+upper_bounds <- sub(".*, (.*)[)]", "\\1", stroke_7_climdiv_results$Confidence_Interval)
+
+# Handle NAs by replacing them with 0
+lower_bounds[is.na(lower_bounds)] <- 0
+upper_bounds[is.na(upper_bounds)] <- 0
+
+# Round the bounds to 2 decimal places
+lower_bounds <- round(as.numeric(lower_bounds), 2)
+upper_bounds <- round(as.numeric(upper_bounds), 2)
+
+# Combine the rounded bounds into the CI column
+stroke_7_climdiv_results$CI <- paste0("(", lower_bounds, ", ", upper_bounds, ")")
+
+# Print stroke_7_climdiv_results or use it further in your analysis
+# remove numeric CI
+stroke_7_climdiv_results <- stroke_7_climdiv_results[, -which(names(stroke_7_climdiv_results) == "Confidence_Interval")]
+# reorder columns
+stroke_7_climdiv_results <- stroke_7_climdiv_results %>%
+  select(Variable, Effect_Size, T_Value, CI, Percent_Contribution)
+
+print(stroke_7_climdiv_results)
+
+#write results to csv
+write.csv(stroke_7_climdiv_results, "stroke_S7_model_7_climdiv.csv", row.names = FALSE)
+
+######## Stroke model 7 with STATE random effects ##########
+coefficients_stroke_7_state <- list()
+se_stroke_7_state <- list()
+tvalue_stroke_7_state <- list()
+lower_bound_7_state <- list()
+upper_bound_7_state <- list()
+
+# mixed effects 
+stroke_7_state <- lmer(STROKE_CrudePrev ~  HI_C_Change70_79_13_22 + OBESITY_CrudePrev_P_div10 + EP_AGE65 +  PCT_ImperviousSurfaces 
+  + CSMOKING_CrudePrev + CHECKUP_CrudePrev + SPL_THEME1 + Temp_C_2013_2022 + LCchangeMEAN +
+  (1 | STATE.x), data = subset_data)
+
+summary(stroke_7_state)
+stroke_7_state_summary <- summary(stroke_7_state)
+stroke_7_state_r2 <- r.squaredGLMM(stroke_7_state)
+print(stroke_7_state_r2)
+AIC(stroke_7_state)
+BIC(stroke_7_state)
+rmse(stroke_7_state_summary)
+
+# Extract coefficients, standard errors, p-values, and calculate 95% confidence intervals
+coefficients_stroke_7_state <- summary(stroke_7_state)$coefficients[, "Estimate"]
+se_stroke_7_state <- summary(stroke_7_state)$coefficients[, "Std. Error"]
+tvalue_stroke_7_state <- summary(stroke_7_state)$coefficients[, "t value"]
+lower_bound_7_state  <-  coefficients_stroke_7_state - 1.96 * se_stroke_7_state 
+upper_bound_7_state  <-  coefficients_stroke_7_state + 1.96 * se_stroke_7_state 
+
+# anomaly size
+avg_HI_C_Change70_79_13_22 <- mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE)
+
+## get percent contribution for each variable 
+# Calculate average anomaly size * coefficient for each variable
+pct_HI_C_Change70_79_13_22_stroke_state <- avg_HI_C_Change70_79_13_22 * coefficients_stroke_7_state["HI_C_Change70_79_13_22"] / avg_stroke *100
+
+# Combine into a data frame with lower and upper bounds in one column
+stroke_7_state_results <- data.frame(
+  Variable = c("Heat Index"),
+  Effect_Size = coefficients_stroke_7_state[c("HI_C_Change70_79_13_22")],
+  T_Value = tvalue_stroke_7_state[c("HI_C_Change70_79_13_22")],
+  Confidence_Interval = paste("(", lower_bound_7_state[c("HI_C_Change70_79_13_22")],
+    ", ", upper_bound_7_state[c("HI_C_Change70_79_13_22")], ")", sep = ""),
+  Percent_Contribution = c(pct_HI_C_Change70_79_13_22_stroke_state)
+)
+
+# Print or further process the results
+print(stroke_7_state_results)
+
+# Round all values in stroke_7_state_results to 2 decimal places
+stroke_7_state_results$Effect_Size <- round(stroke_7_state_results$Effect_Size, 2)
+stroke_7_state_results$T_Value <- round(stroke_7_state_results$T_Value, 2)
+stroke_7_state_results$Percent_Contribution <- round(stroke_7_state_results$Percent_Contribution, 2)
+# Convert CI column to character to avoid rounding issues
+stroke_7_state_results$Confidence_Interval <- as.character(stroke_7_state_results$Confidence_Interval)
+
+# Extract lower and upper bounds from CI, handle NAs, and round them to 2 decimal places
+lower_bounds <- sub("[(](.*),.*", "\\1", stroke_7_state_results$Confidence_Interval)
+upper_bounds <- sub(".*, (.*)[)]", "\\1", stroke_7_state_results$Confidence_Interval)
+
+# Handle NAs by replacing them with 0
+lower_bounds[is.na(lower_bounds)] <- 0
+upper_bounds[is.na(upper_bounds)] <- 0
+
+# Round the bounds to 2 decimal places
+lower_bounds <- round(as.numeric(lower_bounds), 2)
+upper_bounds <- round(as.numeric(upper_bounds), 2)
+
+# Combine the rounded bounds into the CI column
+stroke_7_state_results$CI <- paste0("(", lower_bounds, ", ", upper_bounds, ")")
+
+# Print stroke_7_state_results or use it further in your analysis
+# remove numeric CI
+stroke_7_state_results <- stroke_7_state_results[, -which(names(stroke_7_state_results) == "Confidence_Interval")]
+# reorder columns
+stroke_7_state_results <- stroke_7_state_results %>%
+  select(Variable, Effect_Size, T_Value, CI, Percent_Contribution)
+
+print(stroke_7_state_results)
+
+#write results to csv
+write.csv(stroke_7_state_results, "stroke_S7_model_7_state.csv", row.names = FALSE)
+
+######## CHD model 7 with CLIMDIV random effects ##########
+coefficients_CHD_7_climdiv <- list()
+se_CHD_7_climdiv <- list()
+tvalue_CHD_7_climdiv <- list()
+lower_bound_7_climdiv_chd <- list()
+upper_bound_7_climdiv_chd <- list()
+
+# mixed effects 
+chd_7_climdiv <- lmer(CHD_CrudePrev ~  HI_C_Change70_79_13_22 + OBESITY_CrudePrev_P_div10 + EP_AGE65 +  PCT_ImperviousSurfaces 
+  + CSMOKING_CrudePrev + CHECKUP_CrudePrev + SPL_THEME1 + Temp_C_2013_2022 + LCchangeMEAN +
+  (1 | CLIMDIV), data = subset_data)
+
+summary(chd_7_climdiv)
+chd_7_climdiv_summary <- summary(chd_7_climdiv)
+chd_7_climdiv_r2 <- r.squaredGLMM(chd_7_climdiv)
+print(chd_7_climdiv_r2)
+AIC(chd_7_climdiv)
+BIC(chd_7_climdiv)
+rmse(chd_7_climdiv_summary)
+
+# Extract coefficients, standard errors, p-values, and calculate 95% confidence intervals
+coefficients_CHD_7_climdiv <- summary(chd_7_climdiv)$coefficients[, "Estimate"]
+se_CHD_7_climdiv <- summary(chd_7_climdiv)$coefficients[, "Std. Error"]
+tvalue_CHD_7_climdiv <- summary(chd_7_climdiv)$coefficients[, "t value"]
+lower_bound_7_climdiv_chd  <-  coefficients_CHD_7_climdiv - 1.96 * se_CHD_7_climdiv 
+upper_bound_7_climdiv_chd  <-  coefficients_CHD_7_climdiv + 1.96 * se_CHD_7_climdiv 
+
+# anomaly size
+avg_HI_C_Change70_79_13_22 <- mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE)
+
+## get percent contribution for each variable 
+# Calculate average anomaly size * coefficient for each variable
+pct_HI_C_Change70_79_13_22_chd_climdiv <- avg_HI_C_Change70_79_13_22 * coefficients_CHD_7_climdiv["HI_C_Change70_79_13_22"] / avg_CHD *100
+
+# Combine into a data frame with lower and upper bounds in one column
+CHD_7_climdiv_results <- data.frame(
+  Variable = c("Heat Index"),
+  Effect_Size = coefficients_CHD_7_climdiv[c("HI_C_Change70_79_13_22")],
+  T_Value = tvalue_CHD_7_climdiv[c("HI_C_Change70_79_13_22")],
+  Confidence_Interval = paste("(", lower_bound_7_climdiv_chd[c("HI_C_Change70_79_13_22")],
+    ", ", upper_bound_7_climdiv_chd[c("HI_C_Change70_79_13_22")], ")", sep = ""),
+  Percent_Contribution = c(pct_HI_C_Change70_79_13_22_chd_climdiv)
+)
+
+# Print or further process the results
+print(CHD_7_climdiv_results)
+
+# Round all values in CHD_7_climdiv_results to 2 decimal places
+CHD_7_climdiv_results$Effect_Size <- round(CHD_7_climdiv_results$Effect_Size, 2)
+CHD_7_climdiv_results$T_Value <- round(CHD_7_climdiv_results$T_Value, 2)
+CHD_7_climdiv_results$Percent_Contribution <- round(CHD_7_climdiv_results$Percent_Contribution, 2)
+# Convert CI column to character to avoid rounding issues
+CHD_7_climdiv_results$Confidence_Interval <- as.character(CHD_7_climdiv_results$Confidence_Interval)
+
+# Extract lower and upper bounds from CI, handle NAs, and round them to 2 decimal places
+lower_bounds <- sub("[(](.*),.*", "\\1", CHD_7_climdiv_results$Confidence_Interval)
+upper_bounds <- sub(".*, (.*)[)]", "\\1", CHD_7_climdiv_results$Confidence_Interval)
+
+# Handle NAs by replacing them with 0
+lower_bounds[is.na(lower_bounds)] <- 0
+upper_bounds[is.na(upper_bounds)] <- 0
+
+# Round the bounds to 2 decimal places
+lower_bounds <- round(as.numeric(lower_bounds), 2)
+upper_bounds <- round(as.numeric(upper_bounds), 2)
+
+# Combine the rounded bounds into the CI column
+CHD_7_climdiv_results$CI <- paste0("(", lower_bounds, ", ", upper_bounds, ")")
+
+# Print CHD_7_climdiv_results or use it further in your analysis
+# remove numeric CI
+CHD_7_climdiv_results <- CHD_7_climdiv_results[, -which(names(CHD_7_climdiv_results) == "Confidence_Interval")]
+# reorder columns
+CHD_7_climdiv_results <- CHD_7_climdiv_results %>%
+  select(Variable, Effect_Size, T_Value, CI, Percent_Contribution)
+
+print(CHD_7_climdiv_results)
+
+#write results to csv
+write.csv(CHD_7_climdiv_results, "CHD_S7_model_7_climdiv.csv", row.names = FALSE)
+
+# Create a comprehensive results table for model 7 variants
+model_7_results <- data.frame(
+  Model = c("stroke_7_climdiv", "stroke_7_state", "chd_7_climdiv", "chd_7_State"),
+  
+  # Effect size per unit change (coefficient for HI_C_Change70_79_13_22)
+  Effect_Size = c(
+    summary(stroke_7_climdiv)$coefficients["HI_C_Change70_79_13_22", "Estimate"],
+    summary(stroke_7_state)$coefficients["HI_C_Change70_79_13_22", "Estimate"],
+    summary(chd_7_climdiv)$coefficients["HI_C_Change70_79_13_22", "Estimate"],
+    summary(chd_7_State)$coefficients["HI_C_Change70_79_13_22", "Estimate"]
+  ),
+  
+  # Confidence Intervals (95% CI)
+  CI_Lower = c(
+    summary(stroke_7_climdiv)$coefficients["HI_C_Change70_79_13_22", "Estimate"] - 
+      1.96 * summary(stroke_7_climdiv)$coefficients["HI_C_Change70_79_13_22", "Std. Error"],
+    summary(stroke_7_state)$coefficients["HI_C_Change70_79_13_22", "Estimate"] - 
+      1.96 * summary(stroke_7_state)$coefficients["HI_C_Change70_79_13_22", "Std. Error"],
+    summary(chd_7_climdiv)$coefficients["HI_C_Change70_79_13_22", "Estimate"] - 
+      1.96 * summary(chd_7_climdiv)$coefficients["HI_C_Change70_79_13_22", "Std. Error"],
+    summary(chd_7_State)$coefficients["HI_C_Change70_79_13_22", "Estimate"] - 
+      1.96 * summary(chd_7_State)$coefficients["HI_C_Change70_79_13_22", "Std. Error"]
+  ),
+  
+  CI_Upper = c(
+    summary(stroke_7_climdiv)$coefficients["HI_C_Change70_79_13_22", "Estimate"] + 
+      1.96 * summary(stroke_7_climdiv)$coefficients["HI_C_Change70_79_13_22", "Std. Error"],
+    summary(stroke_7_state)$coefficients["HI_C_Change70_79_13_22", "Estimate"] + 
+      1.96 * summary(stroke_7_state)$coefficients["HI_C_Change70_79_13_22", "Std. Error"],
+    summary(chd_7_climdiv)$coefficients["HI_C_Change70_79_13_22", "Estimate"] + 
+      1.96 * summary(chd_7_climdiv)$coefficients["HI_C_Change70_79_13_22", "Std. Error"],
+    summary(chd_7_State)$coefficients["HI_C_Change70_79_13_22", "Estimate"] + 
+      1.96 * summary(chd_7_State)$coefficients["HI_C_Change70_79_13_22", "Std. Error"]
+  ),
+  
+  # T Values
+  T_Value = c(
+    summary(stroke_7_climdiv)$coefficients["HI_C_Change70_79_13_22", "t value"],
+    summary(stroke_7_state)$coefficients["HI_C_Change70_79_13_22", "t value"],
+    summary(chd_7_climdiv)$coefficients["HI_C_Change70_79_13_22", "t value"],
+    summary(chd_7_State)$coefficients["HI_C_Change70_79_13_22", "t value"]
+  ),
+  
+  # R-squared (marginal and conditional)
+  R2_Marginal = c(
+    r.squaredGLMM(stroke_7_climdiv)[1],  # R2m (marginal)
+    r.squaredGLMM(stroke_7_state)[1],
+    r.squaredGLMM(chd_7_climdiv)[1],
+    r.squaredGLMM(chd_7_State)[1]
+  ),
+  
+  R2_Conditional = c(
+    r.squaredGLMM(stroke_7_climdiv)[2],  # R2c (conditional)
+    r.squaredGLMM(stroke_7_state)[2],
+    r.squaredGLMM(chd_7_climdiv)[2],
+    r.squaredGLMM(chd_7_State)[2]
+  ),
+  
+  # RMSE
+  RMSE = c(
+    calculate_rmse(stroke_7_climdiv),
+    calculate_rmse(stroke_7_state),
+    calculate_rmse(chd_7_climdiv),
+    calculate_rmse(chd_7_State)
+  ),
+  
+  # AIC
+  AIC = c(
+    AIC(stroke_7_climdiv),
+    AIC(stroke_7_state),
+    AIC(chd_7_climdiv),
+    AIC(chd_7_State)
+  ),
+  
+  # BIC
+  BIC = c(
+    BIC(stroke_7_climdiv),
+    BIC(stroke_7_state),
+    BIC(chd_7_climdiv),
+    BIC(chd_7_State)
+  )
+)
+
+# Calculate percent HI contribution for each model
+# You'll need avg_stroke and avg_CHD values that should be calculated earlier in your script
+model_7_results$Percent_HI_Contribution = c(
+  (mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE) * model_7_results$Effect_Size[1] / avg_stroke) * 100,
+  (mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE) * model_7_results$Effect_Size[2] / avg_stroke) * 100,
+  (mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE) * model_7_results$Effect_Size[3] / avg_CHD) * 100,
+  (mean(subset_data$HI_C_Change70_79_13_22, na.rm = TRUE) * model_7_results$Effect_Size[4] / avg_CHD) * 100
+)
+
+# Create formatted confidence interval column
+model_7_results$CI_Formatted = paste0("(", round(model_7_results$CI_Lower, 3), ", ", round(model_7_results$CI_Upper, 3), ")")
+
+# Round numerical columns for presentation
+model_7_results$Effect_Size = round(model_7_results$Effect_Size, 3)
+model_7_results$T_Value = round(model_7_results$T_Value, 2)
+model_7_results$Percent_HI_Contribution = round(model_7_results$Percent_HI_Contribution, 2)
+model_7_results$R2_Marginal = round(model_7_results$R2_Marginal, 3)
+model_7_results$R2_Conditional = round(model_7_results$R2_Conditional, 3)
+model_7_results$RMSE = round(model_7_results$RMSE, 3)
+model_7_results$AIC = round(model_7_results$AIC, 1)
+model_7_results$BIC = round(model_7_results$BIC, 1)
+
+# Select and reorder columns for final output
+final_7_results <- model_7_results %>%
+  select(Model, Effect_Size, CI_Formatted, T_Value, Percent_HI_Contribution, 
+         R2_Marginal, R2_Conditional, RMSE, AIC, BIC)
+
+# Rename columns to match your requested format
+names(final_7_results) <- c("Model", "Effect size per unit change", "CI", "T Value", 
+                         "Percent HI contribution", "R2 Marginal", "R2 Conditional", 
+                         "RMSE", "AIC", "BIC")
+
+print(final_7_results)
+
+# Save to CSV
+write.csv(final_7_results, "model_7_comparison_results.csv", row.names = FALSE)
+
+
+#end of stateclimdiv analysis 11/03/2025
+
 ################################################# Table S4 ###########################################################
 ######################################################################################################################
 ####### join HI 1970-1989, 2003-2022#######################
@@ -5418,6 +6371,33 @@ subset_data_s1$HI_C_Change_Tertile <- cut(subset_data_s1$HI_C_Change70_79_13_22,
 
 subset_data_s1$HI_C_Change_Tertile <- factor(subset_data_s1$HI_C_Change_Tertile, levels = c("Low", "Medium", "High"), ordered = TRUE)
 
+# ---- Variable range by tertile (pivoted) ----
+library(dplyr)
+library(tidyr)
+
+# Calculate min and max for each variable in each tertile
+range_by_tertile <- subset_data_s1 %>%
+  group_by(HI_C_Change_Tertile) %>%
+  summarise(across(all_of(vars), list(min = ~min(. , na.rm = TRUE), max = ~max(. , na.rm = TRUE))))
+
+# Pivot longer so variables are rows
+range_long <- range_by_tertile %>%
+  pivot_longer(
+    cols = -HI_C_Change_Tertile,
+    names_to = c("Variable", ".value"),
+    names_sep = "_"
+  )
+
+# Pivot wider so tertiles are columns
+range_wide <- range_long %>%
+  pivot_wider(
+    names_from = HI_C_Change_Tertile,
+    values_from = c(min, max)
+  )
+
+# Save to CSV
+write.csv(range_wide, "Variable_Ranges_By_Tertile_Pivoted.csv", row.names = FALSE)
+
 ########### tableone mean ######################
 vars <- c("ACCESS7_CrudePrev","ARTHRITIS_CrudePrev", "BINGE_CrudePrev",
           "BPHIGH_CrudePrev", "BPMED_CrudePrev", "CANCER_CrudePrev", "CASTHMA_CrudePrev", "CERVICAL_CrudePrev",
@@ -5446,6 +6426,17 @@ print(tableone_df)
 # Write the results to a CSV file
 write.csv(tableone_df, "Tableone_08_27_2024.csv")
 
+library(dplyr)
+
+# For all variables in 'vars', get min and max by tertile
+range_by_tertile <- subset_data_s1 %>%
+  group_by(HI_C_Change_Tertile) %>%
+  summarise(across(all_of(vars), list(min = ~min(. , na.rm = TRUE), max = ~max(. , na.rm = TRUE))))
+
+print(range_by_tertile)
+
+write.csv(range_by_tertile, "Variable_Ranges_By_Tertile.csv", row.names = FALSE)
+
 # Calculate total population for each quartile
 total_population <- subset_data_s1 %>%
   group_by(HI_C_Change_Tertile) %>%
@@ -5465,3 +6456,92 @@ sd_heat_index <- subset_data_s1 %>%
   group_by(HI_C_Change_Tertile) %>%
   summarise(HI_C_Change70_79_13_22 = sd(HI_C_Change70_79_13_22))
 print(sd_heat_index)
+
+# ---- Percentage of Zeros by Tertile (Table S1) ----
+# Calculate percentage of zeros for each variable in vars by tertile
+pct_zeros_s1 <- subset_data_s1 %>%
+  group_by(HI_C_Change_Tertile) %>%
+  summarise(across(all_of(vars), 
+                   list(pct_zeros = ~(sum(. == 0, na.rm = TRUE) / sum(!is.na(.)) * 100))),
+            .groups = "drop")
+
+# Pivot to make it more readable (variables as rows, tertiles as columns)
+pct_zeros_s1_long <- pct_zeros_s1 %>%
+  pivot_longer(cols = -HI_C_Change_Tertile, 
+               names_to = "Variable", 
+               values_to = "Pct_Zeros") %>%
+  mutate(Variable = gsub("_pct_zeros", "", Variable)) %>%
+  pivot_wider(names_from = HI_C_Change_Tertile, 
+              values_from = Pct_Zeros)
+
+print(pct_zeros_s1_long)
+write.csv(pct_zeros_s1_long, "Table_S1_Percent_Zeros_By_Tertile.csv", row.names = FALSE)
+
+# ---- Percentage of Zeros by Tertile (Table S2 - Variable Ranges) ----
+# For the range table variables, calculate pct zeros
+pct_zeros_s2 <- subset_data_s1 %>%
+  group_by(HI_C_Change_Tertile) %>%
+  summarise(across(all_of(vars), 
+                   list(pct_zeros = ~(sum(. == 0, na.rm = TRUE) / sum(!is.na(.)) * 100))),
+            .groups = "drop")
+
+# Pivot to make it more readable (variables as rows, tertiles as columns)
+pct_zeros_s2_long <- pct_zeros_s2 %>%
+  pivot_longer(cols = -HI_C_Change_Tertile, 
+               names_to = "Variable", 
+               values_to = "Pct_Zeros") %>%
+  mutate(Variable = gsub("_pct_zeros", "", Variable)) %>%
+  pivot_wider(names_from = HI_C_Change_Tertile, 
+              values_from = Pct_Zeros)
+
+print(pct_zeros_s2_long)
+write.csv(pct_zeros_s2_long, "Table_S2_Percent_Zeros_By_Tertile.csv", row.names = FALSE)
+
+############## Additional PCA analysis (redundant) ##############
+
+#install.packages("corrr")
+library('corrr')
+#install.packages("ggcorrplot")
+library(ggcorrplot)
+#install.packages("FactoMineR")
+library("FactoMineR")
+
+subset_data <- read.csv("outputs/Scaled_data_forARCgis_09_16_2024.csv")
+
+original_vars <- c("HI_C_Change70_79_13_22", "Change_Temp_C_70_79_13_22", "Change_RH_70_79_13_22",
+                   "windU_diff70_79_13_22", "windV_diff70_79_13_22", "latent_diff70_79_13_22",
+                   "solar_diff70_79_13_22", "thermal_diff70_79_13_22", "sensible_diff70_79_13_22", "evap_diff70_79_13_22",
+                   "pressure_diff70_79_13_22", 
+                   "precip_diff70_79_13_22", "transpir_diff70_79_13_22", "downwards_solar_diff70_79_13_22")
+
+
+##comment out
+model_vars <- c(
+  "Temp_C_2013_2022",
+  "LCchangeMEAN", 
+  "windU_diff70_79_13_22",
+  "windV_diff70_79_13_22", 
+  "evap_diff70_79_13_22_P_x10",
+  "pressure_diff70_79_13_22_P_div10", 
+  "transpir_diff70_79_13_22_P_x1000",
+  "downwards_solar_diff70_79_13_22_P_Mill", 
+  "HI_C_Change70_79_13_22"
+)
+##
+
+pca_subset_data <- subset_data[,original_vars]
+pca_subset_normalized <- scale(pca_subset_data)
+pca_subset_result <- princomp(pca_subset_normalized)
+plot(pca_subset_result)  # Scree plot to visualize variance explained
+n_components <- sum(pca_subset_result$sdev^2 > 1)  # Kaiser criterion
+pc_subset_scores <- pca_subset_result$scores[, 1:n_components]
+regression_data <- data.frame(merged_data$CHD_CrudePrev, pc_subset_scores)
+pca_regression <- lm(merged_data.CHD_CrudePrev ~ ., data = regression_data)
+summary(pca_regression)
+pca_loadings <- loadings(pca_subset_result)
+print(pca_loadings)
+factor_scores <- pca_subset_result$scores
+factor_scores <- pca_subset_result$scores[, 1:n_components]
+
+eigenvalues <- pca_subset_result$sdev^2
+print(eigenvalues)
